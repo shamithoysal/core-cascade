@@ -37,7 +37,11 @@ module core #(
     output reg [THREADS_PER_BLOCK-1:0] data_mem_write_valid,
     output reg [DATA_MEM_ADDR_BITS-1:0] data_mem_write_address [THREADS_PER_BLOCK-1:0],
     output reg [DATA_MEM_DATA_BITS-1:0] data_mem_write_data [THREADS_PER_BLOCK-1:0],
-    input reg [THREADS_PER_BLOCK-1:0] data_mem_write_ready
+    input reg [THREADS_PER_BLOCK-1:0] data_mem_write_ready,
+    
+    output wire [7:0] current_pc_debug,
+    output wire [2:0] core_state_debug,
+    output wire decoded_ret_debug
 );
     // State
     reg [2:0] core_state;
@@ -112,7 +116,7 @@ module core #(
 
     // Scheduler
     scheduler #(
-        .THREADS_PER_BLOCK(THREADS_PER_BLOCK),
+        .THREADS_PER_BLOCK(THREADS_PER_BLOCK)
     ) scheduler_instance (
         .clk(clk),
         .reset(reset),
@@ -171,7 +175,7 @@ module core #(
             registers #(
                 .THREADS_PER_BLOCK(THREADS_PER_BLOCK),
                 .THREAD_ID(i),
-                .DATA_BITS(DATA_MEM_DATA_BITS),
+                .DATA_BITS(DATA_MEM_DATA_BITS)
             ) register_instance (
                 .clk(clk),
                 .reset(reset),
@@ -209,4 +213,7 @@ module core #(
             );
         end
     endgenerate
+    assign current_pc_debug = current_pc;
+    assign core_state_debug = core_state;
+    assign decoded_ret_debug = decoded_ret;
 endmodule

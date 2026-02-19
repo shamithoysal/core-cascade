@@ -15,7 +15,7 @@
 //   this minimal implementation, we assume no branch divergence (naive approach for simplicity)
 module scheduler #(
     parameter THREADS_PER_BLOCK = 4
-) (
+)(
     input wire clk,
     input wire reset,
     input wire start,

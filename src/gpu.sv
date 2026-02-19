@@ -4,36 +4,36 @@
 // GPU
 // > Built to use an external async memory with multi-channel read/write
 // > Assumes that the program is loaded into program memory, data into data memory, and threads into
-//   the device control register before the start signal is triggered
+// the device control register before the start signal is triggered
 // > Has memory controllers to interface between external memory and its multiple cores
 // > Configurable number of cores and thread capacity per core
 module gpu #(
-    parameter DATA_MEM_ADDR_BITS = 8,        // Number of bits in data memory address (256 rows)
-    parameter DATA_MEM_DATA_BITS = 8,        // Number of bits in data memory value (8 bit data)
-    parameter DATA_MEM_NUM_CHANNELS = 4,     // Number of concurrent channels for sending requests to data memory
-    parameter PROGRAM_MEM_ADDR_BITS = 8,     // Number of bits in program memory address (256 rows)
-    parameter PROGRAM_MEM_DATA_BITS = 16,    // Number of bits in program memory value (16 bit instruction)
-    parameter PROGRAM_MEM_NUM_CHANNELS = 1,  // Number of concurrent channels for sending requests to program memory
-    parameter NUM_CORES = 2,                 // Number of cores to include in this GPU
-    parameter THREADS_PER_BLOCK = 4          // Number of threads to handle per block (determines the compute resources of each core)
+    parameter DATA_MEM_ADDR_BITS = 8, // Number of bits in data memory address (256 rows)
+    parameter DATA_MEM_DATA_BITS = 8, // Number of bits in data memory value (8 bit data)
+    parameter DATA_MEM_NUM_CHANNELS = 4, // Number of concurrent channels for sending requests to data memory
+    parameter PROGRAM_MEM_ADDR_BITS = 8, // Number of bits in program memory address (256 rows)
+    parameter PROGRAM_MEM_DATA_BITS = 16, // Number of bits in program memory value (16 bit instruction)
+    parameter PROGRAM_MEM_NUM_CHANNELS = 1, // Number of concurrent channels for sending requests to program memory
+    parameter NUM_CORES = 2, // Number of cores to include in this GPU
+    parameter THREADS_PER_BLOCK = 4 // Number of threads to handle per block (determines the compute resources of each core)
 ) (
     input wire clk,
     input wire reset,
-
+    
     // Kernel Execution
     input wire start,
     output wire done,
-
+    
     // Device Control Register
     input wire device_control_write_enable,
     input wire [7:0] device_control_data,
-
+    
     // Program Memory
     output wire [PROGRAM_MEM_NUM_CHANNELS-1:0] program_mem_read_valid,
     output wire [PROGRAM_MEM_ADDR_BITS-1:0] program_mem_read_address [PROGRAM_MEM_NUM_CHANNELS-1:0],
     input wire [PROGRAM_MEM_NUM_CHANNELS-1:0] program_mem_read_ready,
     input wire [PROGRAM_MEM_DATA_BITS-1:0] program_mem_read_data [PROGRAM_MEM_NUM_CHANNELS-1:0],
-
+    
     // Data Memory
     output wire [DATA_MEM_NUM_CHANNELS-1:0] data_mem_read_valid,
     output wire [DATA_MEM_ADDR_BITS-1:0] data_mem_read_address [DATA_MEM_NUM_CHANNELS-1:0],
@@ -42,8 +42,16 @@ module gpu #(
     output wire [DATA_MEM_NUM_CHANNELS-1:0] data_mem_write_valid,
     output wire [DATA_MEM_ADDR_BITS-1:0] data_mem_write_address [DATA_MEM_NUM_CHANNELS-1:0],
     output wire [DATA_MEM_DATA_BITS-1:0] data_mem_write_data [DATA_MEM_NUM_CHANNELS-1:0],
-    input wire [DATA_MEM_NUM_CHANNELS-1:0] data_mem_write_ready
+    input wire [DATA_MEM_NUM_CHANNELS-1:0] data_mem_write_ready,
+
+    // NEW DEBUG PORTS (Must match tb_gpu names exactly)
+    output wire [7:0] current_pc,
+    output wire [2:0] core_state,
+    output wire decoded_ret,
+    output wire [7:0] blocks_dispatched,
+    output wire [7:0] blocks_done
 );
+
     // Control
     wire [7:0] thread_count;
 
@@ -71,12 +79,16 @@ module gpu #(
     reg [PROGRAM_MEM_ADDR_BITS-1:0] fetcher_read_address [NUM_FETCHERS-1:0];
     reg [NUM_FETCHERS-1:0] fetcher_read_ready;
     reg [PROGRAM_MEM_DATA_BITS-1:0] fetcher_read_data [NUM_FETCHERS-1:0];
-    
+
+    // Arrays to hold debug signals from all cores
+    wire [7:0] debug_pc_signals [NUM_CORES-1:0];
+    wire [2:0] debug_core_state_signals [NUM_CORES-1:0];
+    wire [NUM_CORES-1:0] debug_decoded_ret_signals;
+
     // Device Control Register
     dcr dcr_instance (
         .clk(clk),
         .reset(reset),
-
         .device_control_write_enable(device_control_write_enable),
         .device_control_data(device_control_data),
         .thread_count(thread_count)
@@ -91,7 +103,6 @@ module gpu #(
     ) data_memory_controller (
         .clk(clk),
         .reset(reset),
-
         .consumer_read_valid(lsu_read_valid),
         .consumer_read_address(lsu_read_address),
         .consumer_read_ready(lsu_read_ready),
@@ -100,7 +111,6 @@ module gpu #(
         .consumer_write_address(lsu_write_address),
         .consumer_write_data(lsu_write_data),
         .consumer_write_ready(lsu_write_ready),
-
         .mem_read_valid(data_mem_read_valid),
         .mem_read_address(data_mem_read_address),
         .mem_read_ready(data_mem_read_ready),
@@ -121,16 +131,14 @@ module gpu #(
     ) program_memory_controller (
         .clk(clk),
         .reset(reset),
-
         .consumer_read_valid(fetcher_read_valid),
         .consumer_read_address(fetcher_read_address),
         .consumer_read_ready(fetcher_read_ready),
         .consumer_read_data(fetcher_read_data),
-
         .mem_read_valid(program_mem_read_valid),
         .mem_read_address(program_mem_read_address),
         .mem_read_ready(program_mem_read_ready),
-        .mem_read_data(program_mem_read_data),
+        .mem_read_data(program_mem_read_data)
     );
 
     // Dispatcher
@@ -147,7 +155,9 @@ module gpu #(
         .core_reset(core_reset),
         .core_block_id(core_block_id),
         .core_thread_count(core_thread_count),
-        .done(done)
+        .done(done),
+        .blocks_dispatched_debug(blocks_dispatched),
+        .blocks_done_debug(blocks_done)
     );
 
     // Compute Cores
@@ -169,14 +179,12 @@ module gpu #(
             genvar j;
             for (j = 0; j < THREADS_PER_BLOCK; j = j + 1) begin
                 localparam lsu_index = i * THREADS_PER_BLOCK + j;
-                always @(posedge clk) begin 
+                always @(posedge clk) begin
                     lsu_read_valid[lsu_index] <= core_lsu_read_valid[j];
                     lsu_read_address[lsu_index] <= core_lsu_read_address[j];
-
                     lsu_write_valid[lsu_index] <= core_lsu_write_valid[j];
                     lsu_write_address[lsu_index] <= core_lsu_write_address[j];
                     lsu_write_data[lsu_index] <= core_lsu_write_data[j];
-                    
                     core_lsu_read_ready[j] <= lsu_read_ready[lsu_index];
                     core_lsu_read_data[j] <= lsu_read_data[lsu_index];
                     core_lsu_write_ready[j] <= lsu_write_ready[lsu_index];
@@ -189,7 +197,7 @@ module gpu #(
                 .DATA_MEM_DATA_BITS(DATA_MEM_DATA_BITS),
                 .PROGRAM_MEM_ADDR_BITS(PROGRAM_MEM_ADDR_BITS),
                 .PROGRAM_MEM_DATA_BITS(PROGRAM_MEM_DATA_BITS),
-                .THREADS_PER_BLOCK(THREADS_PER_BLOCK),
+                .THREADS_PER_BLOCK(THREADS_PER_BLOCK)
             ) core_instance (
                 .clk(clk),
                 .reset(core_reset[i]),
@@ -197,12 +205,10 @@ module gpu #(
                 .done(core_done[i]),
                 .block_id(core_block_id[i]),
                 .thread_count(core_thread_count[i]),
-                
                 .program_mem_read_valid(fetcher_read_valid[i]),
                 .program_mem_read_address(fetcher_read_address[i]),
                 .program_mem_read_ready(fetcher_read_ready[i]),
                 .program_mem_read_data(fetcher_read_data[i]),
-
                 .data_mem_read_valid(core_lsu_read_valid),
                 .data_mem_read_address(core_lsu_read_address),
                 .data_mem_read_ready(core_lsu_read_ready),
@@ -210,8 +216,22 @@ module gpu #(
                 .data_mem_write_valid(core_lsu_write_valid),
                 .data_mem_write_address(core_lsu_write_address),
                 .data_mem_write_data(core_lsu_write_data),
-                .data_mem_write_ready(core_lsu_write_ready)
+                .data_mem_write_ready(core_lsu_write_ready),
+                
+                // Connect Debug Signals
+                // This connects the internal core signals to our unpacked array at index [i]
+                .current_pc_debug(debug_pc_signals[i]),
+                .core_state_debug(debug_core_state_signals[i]),
+                .decoded_ret_debug(debug_decoded_ret_signals[i])
             );
         end
     endgenerate
+
+    // -------------------------------------------------------------
+    // FIX: Select Core 0 (index ) for the top-level debug ports
+    // -------------------------------------------------------------
+    assign current_pc = debug_pc_signals[1];
+    assign core_state = debug_core_state_signals[1];
+    assign decoded_ret = debug_decoded_ret_signals[1];
+
 endmodule
