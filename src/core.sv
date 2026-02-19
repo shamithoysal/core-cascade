@@ -1,34 +1,26 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-// COMPUTE CORE
-// > Handles processing 1 block at a time
-// > The core also has it's own scheduler to manage control flow
-// > Each core contains 1 fetcher & decoder, and register files, ALUs, LSUs, PC for each thread
 module core #(
     parameter DATA_MEM_ADDR_BITS = 8,
-    parameter DATA_MEM_DATA_BITS = 8,
-    parameter PROGRAM_MEM_ADDR_BITS = 8,
+    parameter DATA_MEM_DATA_BITS = 32, // Upgraded to 32-bit for Fixed Point
+    parameter PROGRAM_MEM_ADDR_BITS = 8, // PC remains 8-bit (256 instructions)
     parameter PROGRAM_MEM_DATA_BITS = 16,
     parameter THREADS_PER_BLOCK = 4
 ) (
     input wire clk,
     input wire reset,
-
     // Kernel Execution
     input wire start,
     output wire done,
-
     // Block Metadata
     input wire [7:0] block_id,
     input wire [$clog2(THREADS_PER_BLOCK):0] thread_count,
-
     // Program Memory
     output reg program_mem_read_valid,
     output reg [PROGRAM_MEM_ADDR_BITS-1:0] program_mem_read_address,
     input reg program_mem_read_ready,
     input reg [PROGRAM_MEM_DATA_BITS-1:0] program_mem_read_data,
-
     // Data Memory
     output reg [THREADS_PER_BLOCK-1:0] data_mem_read_valid,
     output reg [DATA_MEM_ADDR_BITS-1:0] data_mem_read_address [THREADS_PER_BLOCK-1:0],
@@ -39,40 +31,47 @@ module core #(
     output reg [DATA_MEM_DATA_BITS-1:0] data_mem_write_data [THREADS_PER_BLOCK-1:0],
     input reg [THREADS_PER_BLOCK-1:0] data_mem_write_ready,
     
-    output wire [7:0] current_pc_debug,
+    // DEBUG PORTS (PC is 8-bit, matching PROGRAM_MEM_ADDR_BITS)
+    output wire [PROGRAM_MEM_ADDR_BITS-1:0] current_pc_debug,
     output wire [2:0] core_state_debug,
     output wire decoded_ret_debug
 );
+
     // State
     reg [2:0] core_state;
     reg [2:0] fetcher_state;
     reg [15:0] instruction;
 
     // Intermediate Signals
-    reg [7:0] current_pc;
-    wire [7:0] next_pc[THREADS_PER_BLOCK-1:0];
-    reg [7:0] rs[THREADS_PER_BLOCK-1:0];
-    reg [7:0] rt[THREADS_PER_BLOCK-1:0];
-    reg [1:0] lsu_state[THREADS_PER_BLOCK-1:0];
-    reg [7:0] lsu_out[THREADS_PER_BLOCK-1:0];
-    wire [7:0] alu_out[THREADS_PER_BLOCK-1:0];
+    // FIX: PC signals must be 8-bit, not 32-bit
+    reg [PROGRAM_MEM_ADDR_BITS-1:0] current_pc;
+    wire [PROGRAM_MEM_ADDR_BITS-1:0] next_pc[THREADS_PER_BLOCK-1:0];
     
+    // Data signals are 32-bit
+    reg [DATA_MEM_DATA_BITS-1:0] rs[THREADS_PER_BLOCK-1:0];
+    reg [DATA_MEM_DATA_BITS-1:0] rt[THREADS_PER_BLOCK-1:0];
+    reg [1:0] lsu_state[THREADS_PER_BLOCK-1:0];
+    reg [DATA_MEM_DATA_BITS-1:0] lsu_out[THREADS_PER_BLOCK-1:0];
+    wire [DATA_MEM_DATA_BITS-1:0] alu_out[THREADS_PER_BLOCK-1:0];
+
     // Decoded Instruction Signals
     reg [3:0] decoded_rd_address;
     reg [3:0] decoded_rs_address;
     reg [3:0] decoded_rt_address;
     reg [2:0] decoded_nzp;
-    reg [7:0] decoded_immediate;
+    
+    // Immediate from instruction is only 8 bits
+    reg [7:0] decoded_immediate; 
 
     // Decoded Control Signals
-    reg decoded_reg_write_enable;           // Enable writing to a register
-    reg decoded_mem_read_enable;            // Enable reading from memory
-    reg decoded_mem_write_enable;           // Enable writing to memory
-    reg decoded_nzp_write_enable;           // Enable writing to NZP register
-    reg [1:0] decoded_reg_input_mux;        // Select input to register
-    reg [1:0] decoded_alu_arithmetic_mux;   // Select arithmetic operation
-    reg decoded_alu_output_mux;             // Select operation in ALU
-    reg decoded_pc_mux;                     // Select source of next PC
+    reg decoded_reg_write_enable;
+    reg decoded_mem_read_enable;
+    reg decoded_mem_write_enable;
+    reg decoded_nzp_write_enable;
+    reg [1:0] decoded_reg_input_mux;
+    reg [2:0] decoded_alu_arithmetic_mux; // 3-bit for new ALU
+    reg decoded_alu_output_mux;
+    reg decoded_pc_mux;
     reg decoded_ret;
 
     // Fetcher
@@ -89,7 +88,7 @@ module core #(
         .mem_read_ready(program_mem_read_ready),
         .mem_read_data(program_mem_read_data),
         .fetcher_state(fetcher_state),
-        .instruction(instruction) 
+        .instruction(instruction)
     );
 
     // Decoder
@@ -127,12 +126,12 @@ module core #(
         .decoded_mem_write_enable(decoded_mem_write_enable),
         .decoded_ret(decoded_ret),
         .lsu_state(lsu_state),
-        .current_pc(current_pc),
+        // Fix: Scheduler expects 8-bit PC signals
+        .current_pc(current_pc), 
         .next_pc(next_pc),
         .done(done)
     );
 
-    // Dedicated ALU, LSU, registers, & PC unit for each thread this core has capacity for
     genvar i;
     generate
         for (i = 0; i < THREADS_PER_BLOCK; i = i + 1) begin : threads
@@ -150,7 +149,9 @@ module core #(
             );
 
             // LSU
-            lsu lsu_instance (
+            lsu #(
+                .DATA_BITS(DATA_MEM_DATA_BITS)
+            ) lsu_instance (
                 .clk(clk),
                 .reset(reset),
                 .enable(i < thread_count),
@@ -187,7 +188,8 @@ module core #(
                 .decoded_rd_address(decoded_rd_address),
                 .decoded_rs_address(decoded_rs_address),
                 .decoded_rt_address(decoded_rt_address),
-                .decoded_immediate(decoded_immediate),
+                // FIX: Zero-extend 8-bit immediate to 32-bit input for registers
+                .decoded_immediate({ {(DATA_MEM_DATA_BITS-8){1'b0}}, decoded_immediate }),
                 .alu_out(alu_out[i]),
                 .lsu_out(lsu_out[i]),
                 .rs(rs[i]),
@@ -204,7 +206,8 @@ module core #(
                 .enable(i < thread_count),
                 .core_state(core_state),
                 .decoded_nzp(decoded_nzp),
-                .decoded_immediate(decoded_immediate),
+                // FIX: Zero-extend 8-bit immediate for PC module
+                .decoded_immediate({ {(DATA_MEM_DATA_BITS-8){1'b0}}, decoded_immediate }),
                 .decoded_nzp_write_enable(decoded_nzp_write_enable),
                 .decoded_pc_mux(decoded_pc_mux),
                 .alu_out(alu_out[i]),
@@ -213,7 +216,10 @@ module core #(
             );
         end
     endgenerate
+
+    // Debug assignments
     assign current_pc_debug = current_pc;
     assign core_state_debug = core_state;
     assign decoded_ret_debug = decoded_ret;
+
 endmodule

@@ -5,35 +5,32 @@
 // > Handles asynchronous memory load and store operations and waits for response
 // > Each thread in each core has it's own LSU
 // > LDR, STR instructions are executed here
-module lsu (
+module lsu #(
+    parameter DATA_BITS = 32 // DEFAULT TO 32
+) (
     input wire clk,
     input wire reset,
-    input wire enable, // If current block has less threads then block size, some LSUs will be inactive
-
+    input wire enable,
     // State
     input reg [2:0] core_state,
-
-    // Memory Control Sgiansl
+    // Memory Control Signals
     input reg decoded_mem_read_enable,
     input reg decoded_mem_write_enable,
-
-    // Registers
-    input reg [7:0] rs,
-    input reg [7:0] rt,
-
+    // Registers (32-bit inputs)
+    input reg [DATA_BITS-1:0] rs,
+    input reg [DATA_BITS-1:0] rt,
     // Data Memory
     output reg mem_read_valid,
-    output reg [7:0] mem_read_address,
+    output reg [7:0] mem_read_address, // Address width usually separate
     input reg mem_read_ready,
-    input reg [7:0] mem_read_data,
+    input reg [DATA_BITS-1:0] mem_read_data,
     output reg mem_write_valid,
     output reg [7:0] mem_write_address,
-    output reg [7:0] mem_write_data,
+    output reg [DATA_BITS-1:0] mem_write_data,
     input reg mem_write_ready,
-
     // LSU Outputs
     output reg [1:0] lsu_state,
-    output reg [7:0] lsu_out
+    output reg [DATA_BITS-1:0] lsu_out
 );
     localparam IDLE = 2'b00, REQUESTING = 2'b01, WAITING = 2'b10, DONE = 2'b11;
 
@@ -47,49 +44,40 @@ module lsu (
             mem_write_address <= 0;
             mem_write_data <= 0;
         end else if (enable) begin
-            // If memory read enable is triggered (LDR instruction)
-            if (decoded_mem_read_enable) begin 
+            // LDR Instruction
+            if (decoded_mem_read_enable) begin
                 case (lsu_state)
                     IDLE: begin
-                        // Only read when core_state = REQUEST
-                        if (core_state == 3'b011) begin 
-                            lsu_state <= REQUESTING;
-                        end
+                        if (core_state == 3'b011) lsu_state <= REQUESTING;
                     end
-                    REQUESTING: begin 
+                    REQUESTING: begin
                         mem_read_valid <= 1;
-                        mem_read_address <= rs;
+                        mem_read_address <= rs[7:0]; // Truncate 32-bit reg to 8-bit addr
                         lsu_state <= WAITING;
                     end
                     WAITING: begin
                         if (mem_read_ready == 1) begin
                             mem_read_valid <= 0;
-                            lsu_out <= mem_read_data;
+                            lsu_out <= mem_read_data; // Capture 32-bit data
                             lsu_state <= DONE;
                         end
                     end
-                    DONE: begin 
-                        // Reset when core_state = UPDATE
-                        if (core_state == 3'b110) begin 
-                            lsu_state <= IDLE;
-                        end
+                    DONE: begin
+                        if (core_state == 3'b110) lsu_state <= IDLE;
                     end
                 endcase
             end
-
-            // If memory write enable is triggered (STR instruction)
-            if (decoded_mem_write_enable) begin 
+            
+            // STR Instruction
+            if (decoded_mem_write_enable) begin
                 case (lsu_state)
                     IDLE: begin
-                        // Only read when core_state = REQUEST
-                        if (core_state == 3'b011) begin 
-                            lsu_state <= REQUESTING;
-                        end
+                        if (core_state == 3'b011) lsu_state <= REQUESTING;
                     end
-                    REQUESTING: begin 
+                    REQUESTING: begin
                         mem_write_valid <= 1;
-                        mem_write_address <= rs;
-                        mem_write_data <= rt;
+                        mem_write_address <= rs[7:0]; // Addr from RS
+                        mem_write_data <= rt;         // Data from RT (32-bit)
                         lsu_state <= WAITING;
                     end
                     WAITING: begin
@@ -98,11 +86,8 @@ module lsu (
                             lsu_state <= DONE;
                         end
                     end
-                    DONE: begin 
-                        // Reset when core_state = UPDATE
-                        if (core_state == 3'b110) begin 
-                            lsu_state <= IDLE;
-                        end
+                    DONE: begin
+                        if (core_state == 3'b110) lsu_state <= IDLE;
                     end
                 endcase
             end

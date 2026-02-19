@@ -1,21 +1,15 @@
 `default_nettype none
 `timescale 1ns/1ns
 
-// GPU
-// > Built to use an external async memory with multi-channel read/write
-// > Assumes that the program is loaded into program memory, data into data memory, and threads into
-// the device control register before the start signal is triggered
-// > Has memory controllers to interface between external memory and its multiple cores
-// > Configurable number of cores and thread capacity per core
 module gpu #(
-    parameter DATA_MEM_ADDR_BITS = 8, // Number of bits in data memory address (256 rows)
-    parameter DATA_MEM_DATA_BITS = 8, // Number of bits in data memory value (8 bit data)
-    parameter DATA_MEM_NUM_CHANNELS = 4, // Number of concurrent channels for sending requests to data memory
-    parameter PROGRAM_MEM_ADDR_BITS = 8, // Number of bits in program memory address (256 rows)
-    parameter PROGRAM_MEM_DATA_BITS = 16, // Number of bits in program memory value (16 bit instruction)
-    parameter PROGRAM_MEM_NUM_CHANNELS = 1, // Number of concurrent channels for sending requests to program memory
-    parameter NUM_CORES = 2, // Number of cores to include in this GPU
-    parameter THREADS_PER_BLOCK = 4 // Number of threads to handle per block (determines the compute resources of each core)
+    parameter DATA_MEM_ADDR_BITS = 8,
+    parameter DATA_MEM_DATA_BITS = 32, // Fixed Point 32-bit
+    parameter DATA_MEM_NUM_CHANNELS = 4,
+    parameter PROGRAM_MEM_ADDR_BITS = 8,
+    parameter PROGRAM_MEM_DATA_BITS = 16,
+    parameter PROGRAM_MEM_NUM_CHANNELS = 1,
+    parameter NUM_CORES = 2,
+    parameter THREADS_PER_BLOCK = 4
 ) (
     input wire clk,
     input wire reset,
@@ -44,7 +38,7 @@ module gpu #(
     output wire [DATA_MEM_DATA_BITS-1:0] data_mem_write_data [DATA_MEM_NUM_CHANNELS-1:0],
     input wire [DATA_MEM_NUM_CHANNELS-1:0] data_mem_write_ready,
 
-    // NEW DEBUG PORTS (Must match tb_gpu names exactly)
+    // DEBUG PORTS
     output wire [7:0] current_pc,
     output wire [2:0] core_state,
     output wire decoded_ret,
@@ -58,7 +52,7 @@ module gpu #(
     // Compute Core State
     reg [NUM_CORES-1:0] core_start;
     reg [NUM_CORES-1:0] core_reset;
-    reg [NUM_CORES-1:0] core_done;
+    wire [NUM_CORES-1:0] core_done; // Must be wire
     reg [7:0] core_block_id [NUM_CORES-1:0];
     reg [$clog2(THREADS_PER_BLOCK):0] core_thread_count [NUM_CORES-1:0];
 
@@ -80,8 +74,8 @@ module gpu #(
     reg [NUM_FETCHERS-1:0] fetcher_read_ready;
     reg [PROGRAM_MEM_DATA_BITS-1:0] fetcher_read_data [NUM_FETCHERS-1:0];
 
-    // Arrays to hold debug signals from all cores
-    wire [7:0] debug_pc_signals [NUM_CORES-1:0];
+    // DEBUG ARRAYS (PC is 8-bit to match core.sv)
+    wire [7:0] debug_pc_signals [NUM_CORES-1:0]; 
     wire [2:0] debug_core_state_signals [NUM_CORES-1:0];
     wire [NUM_CORES-1:0] debug_decoded_ret_signals;
 
@@ -156,16 +150,14 @@ module gpu #(
         .core_block_id(core_block_id),
         .core_thread_count(core_thread_count),
         .done(done),
-        .blocks_dispatched_debug(blocks_dispatched),
-        .blocks_done_debug(blocks_done)
+        .blocks_dispatched_debug(blocks_dispatched), 
+        .blocks_done_debug(blocks_done)              
     );
 
     // Compute Cores
     genvar i;
     generate
         for (i = 0; i < NUM_CORES; i = i + 1) begin : cores
-            // EDA: We create separate signals here to pass to cores because of a requirement
-            // by the OpenLane EDA flow (uses Verilog 2005) that prevents slicing the top-level signals
             reg [THREADS_PER_BLOCK-1:0] core_lsu_read_valid;
             reg [DATA_MEM_ADDR_BITS-1:0] core_lsu_read_address [THREADS_PER_BLOCK-1:0];
             reg [THREADS_PER_BLOCK-1:0] core_lsu_read_ready;
@@ -175,7 +167,6 @@ module gpu #(
             reg [DATA_MEM_DATA_BITS-1:0] core_lsu_write_data [THREADS_PER_BLOCK-1:0];
             reg [THREADS_PER_BLOCK-1:0] core_lsu_write_ready;
 
-            // Pass through signals between LSUs and data memory controller
             genvar j;
             for (j = 0; j < THREADS_PER_BLOCK; j = j + 1) begin
                 localparam lsu_index = i * THREADS_PER_BLOCK + j;
@@ -191,7 +182,6 @@ module gpu #(
                 end
             end
 
-            // Compute Core
             core #(
                 .DATA_MEM_ADDR_BITS(DATA_MEM_ADDR_BITS),
                 .DATA_MEM_DATA_BITS(DATA_MEM_DATA_BITS),
@@ -218,8 +208,7 @@ module gpu #(
                 .data_mem_write_data(core_lsu_write_data),
                 .data_mem_write_ready(core_lsu_write_ready),
                 
-                // Connect Debug Signals
-                // This connects the internal core signals to our unpacked array at index [i]
+                // Debug signal connections to unpacked array
                 .current_pc_debug(debug_pc_signals[i]),
                 .core_state_debug(debug_core_state_signals[i]),
                 .decoded_ret_debug(debug_decoded_ret_signals[i])
@@ -228,10 +217,10 @@ module gpu #(
     endgenerate
 
     // -------------------------------------------------------------
-    // FIX: Select Core 0 (index ) for the top-level debug ports
+    // ASSIGN DEBUG PORTS (Select Core 0)
     // -------------------------------------------------------------
-    assign current_pc = debug_pc_signals[1];
-    assign core_state = debug_core_state_signals[1];
-    assign decoded_ret = debug_decoded_ret_signals[1];
+    assign current_pc = debug_pc_signals[0];
+    assign core_state = debug_core_state_signals[0];
+    assign decoded_ret = debug_decoded_ret_signals[0];
 
 endmodule
