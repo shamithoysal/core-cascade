@@ -44,12 +44,12 @@ module registers #(
             
             // Read-Only Registers (R13-R15)
             // Note: R13 is block_id (updated dynamically), R14/R15 are static
-            registers[1] <= 0; 
-            registers[2] <= THREADS_PER_BLOCK; 
-            registers[3] <= THREAD_ID; 
+            registers[13] <= 0; 
+            registers[14] <= THREADS_PER_BLOCK; 
+            registers[15] <= THREAD_ID; 
         end else if (enable) begin
             // Update Block ID register (R13)
-            registers[1] <= block_id; 
+            registers[13] <= block_id; 
 
             // READ (Output to ALU/LSU)
             if (core_state == 3'b011) begin
