@@ -12,7 +12,7 @@ module registers #(
     input wire clk,
     input wire reset,
     input wire enable,
-    input wire [7:0] block_id, // Wire is fine for inputs
+    input wire [31:0] block_id, // Expanded
     input wire [2:0] core_state,
     input wire [3:0] decoded_rd_address,
     input wire [3:0] decoded_rs_address,

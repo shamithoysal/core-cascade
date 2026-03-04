@@ -20,7 +20,7 @@ module gpu #(
     
     // Device Control Register
     input wire device_control_write_enable,
-    input wire [7:0] device_control_data,
+    input wire [31:0] device_control_data, // Expanded
     
     // Program Memory
     output wire [PROGRAM_MEM_NUM_CHANNELS-1:0] program_mem_read_valid,
@@ -42,18 +42,18 @@ module gpu #(
     output wire [7:0] current_pc,
     output wire [2:0] core_state,
     output wire decoded_ret,
-    output wire [7:0] blocks_dispatched,
-    output wire [7:0] blocks_done
+    output wire [31:0] blocks_dispatched, // Expanded
+    output wire [31:0] blocks_done // Expanded
 );
 
     // Control
-    wire [7:0] thread_count;
+    wire [31:0] thread_count; // Expanded
 
     // Compute Core State
     reg [NUM_CORES-1:0] core_start;
     reg [NUM_CORES-1:0] core_reset;
     wire [NUM_CORES-1:0] core_done; // Must be wire
-    reg [7:0] core_block_id [NUM_CORES-1:0];
+    reg [31:0] core_block_id [NUM_CORES-1:0]; // Expanded
     reg [$clog2(THREADS_PER_BLOCK):0] core_thread_count [NUM_CORES-1:0];
 
     // LSU <> Data Memory Controller Channels

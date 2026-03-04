@@ -9,16 +9,16 @@ module dcr (
     input wire reset,
 
     input wire device_control_write_enable,
-    input wire [7:0] device_control_data,
-    output wire [7:0] thread_count
+    input wire [31:0] device_control_data, // Expanded
+    output wire [31:0] thread_count // Expanded
 );
     // Store device control data in dedicated register
-    reg [7:0] device_conrol_register;
+    reg [31:0] device_conrol_register; // Expanded
     assign thread_count = device_conrol_register[7:0];
 
     always @(posedge clk) begin
         if (reset) begin
-            device_conrol_register <= 8'b0;
+            device_conrol_register <= 32'b0;
         end else begin
             if (device_control_write_enable) begin 
                 device_conrol_register <= device_control_data;

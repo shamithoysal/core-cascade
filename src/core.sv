@@ -14,7 +14,7 @@ module core #(
     input wire start,
     output wire done,
     // Block Metadata
-    input wire [7:0] block_id,
+    input wire [31:0] block_id, // Expanded
     input wire [$clog2(THREADS_PER_BLOCK):0] thread_count,
     // Program Memory
     output reg program_mem_read_valid,

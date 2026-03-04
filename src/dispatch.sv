@@ -10,28 +10,28 @@ module dispatch #(
     input wire start,
 
     // Kernel Metadata
-    input wire [7:0] thread_count,
+    input wire [31:0] thread_count, // Expanded
 
     // Core States
     // Note: In strict Verilog, inputs driven by wires should be wire, but SV allows reg.
     input reg [NUM_CORES-1:0] core_done, 
     output reg [NUM_CORES-1:0] core_start,
     output reg [NUM_CORES-1:0] core_reset,
-    output reg [7:0] core_block_id [NUM_CORES-1:0],
+    output reg [31:0] core_block_id [NUM_CORES-1:0], // Expanded
     output reg [$clog2(THREADS_PER_BLOCK):0] core_thread_count [NUM_CORES-1:0],
 
     // Kernel Execution
     output reg done,
     // DEBUG PORTS
-    output wire [7:0] blocks_dispatched_debug,
-    output wire [7:0] blocks_done_debug
+    output wire [31:0] blocks_dispatched_debug, // Expanded
+    output wire [31:0] blocks_done_debug // Expanded
 );
     // Calculate the total number of blocks
-    wire [7:0] total_blocks;
+    wire [31:0] total_blocks; // Expanded
     assign total_blocks = (thread_count + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
-    reg [7:0] blocks_dispatched;
-    reg [7:0] blocks_done;
+    reg [31:0] blocks_dispatched; // Expanded
+    reg [31:0] blocks_done; // Expanded
     
     // NEW: Active state to keep dispatcher running after 'start' pulse drops
     reg active; 
