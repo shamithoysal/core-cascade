@@ -1,1 +1,2 @@
-# Mandelbrot Set Renderer on Custom TinyGPU
+# Mandelbrot Set Renderer on Custom TinyGPU (Work In Progress)
+
