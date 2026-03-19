@@ -14,7 +14,7 @@ module dcr (
 );
     // Store device control data in dedicated register
     reg [31:0] device_conrol_register; // Expanded
-    assign thread_count = device_conrol_register[7:0];
+    assign thread_count = device_conrol_register; //BUG FIXED
 
     always @(posedge clk) begin
         if (reset) begin

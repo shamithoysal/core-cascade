@@ -33,12 +33,12 @@ module tb_gpu;
     logic decoded_ret;
     logic [7:0] current_pc;
     logic [2:0] core_state;
-    logic [7:0] blocks_dispatched; 
-    logic [7:0] blocks_done; 
+    logic [31:0] blocks_dispatched; 
+    logic [31:0] blocks_done;      
 
     // Device Control (Thread Count)
     logic device_control_write_enable;
-    logic [7:0] device_control_data;
+    logic [31:0] device_control_data;
 
     // Program Memory Interface
     logic [PROGRAM_MEM_NUM_CHANNELS-1:0] program_mem_read_valid;
@@ -178,7 +178,7 @@ module tb_gpu;
         // 3. Configure GPU (Set Thread Count)
         @(posedge clk);
         device_control_write_enable = 1;
-        device_control_data = 8'd16; // Execute 16 threads
+        device_control_data = 32'd16; // Execute 16 threads
         @(posedge clk);
         device_control_write_enable = 0;
 
@@ -194,8 +194,8 @@ module tb_gpu;
             begin
                 wait (done);
                 $display("GPU execution finished successfully at time %0t.", $time);
-                // Print Result at Address 2 (Expect 0.25 -> 0x00400000 if using test_fixed.hex)
-                $display("Result at Addr 2: %h", data_mem[1]); 
+                // Print Result at Address 2 (Expect 0.25 -> 0x00400000)
+                $display("Result at Addr 2: %h", data_mem[2]); 
             end
             begin
                 #100000; // 100,000 ns timeout
