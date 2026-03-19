@@ -5,8 +5,12 @@
 // > Handles asynchronous memory load and store operations and waits for response
 // > Each thread in each core has it's own LSU
 // > LDR, STR instructions are executed here
+`default_nettype none
+`timescale 1ns/1ns
+
 module lsu #(
-    parameter DATA_BITS = 32 // DEFAULT TO 32
+    parameter ADDR_BITS = 12, // FIX: Added ADDR_BITS parameter
+    parameter DATA_BITS = 32
 ) (
     input wire clk,
     input wire reset,
@@ -21,11 +25,11 @@ module lsu #(
     input reg [DATA_BITS-1:0] rt,
     // Data Memory
     output reg mem_read_valid,
-    output reg [7:0] mem_read_address, // Address width usually separate
+    output reg [ADDR_BITS-1:0] mem_read_address, // FIX: Expanded width
     input reg mem_read_ready,
     input reg [DATA_BITS-1:0] mem_read_data,
     output reg mem_write_valid,
-    output reg [7:0] mem_write_address,
+    output reg [ADDR_BITS-1:0] mem_write_address, // FIX: Expanded width
     output reg [DATA_BITS-1:0] mem_write_data,
     input reg mem_write_ready,
     // LSU Outputs
@@ -52,7 +56,7 @@ module lsu #(
                     end
                     REQUESTING: begin
                         mem_read_valid <= 1;
-                        mem_read_address <= rs[7:0]; // Truncate 32-bit reg to 8-bit addr
+                        mem_read_address <= rs[ADDR_BITS-1:0]; // FIX: Extract 12-bit address
                         lsu_state <= WAITING;
                     end
                     WAITING: begin
@@ -76,7 +80,7 @@ module lsu #(
                     end
                     REQUESTING: begin
                         mem_write_valid <= 1;
-                        mem_write_address <= rs[7:0]; // Addr from RS
+                        mem_write_address <= rs[ADDR_BITS-1:0]; // FIX: Extract 12-bit address
                         mem_write_data <= rt;         // Data from RT (32-bit)
                         lsu_state <= WAITING;
                     end

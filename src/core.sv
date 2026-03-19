@@ -150,6 +150,7 @@ module core #(
 
             // LSU
             lsu #(
+                .ADDR_BITS(DATA_MEM_ADDR_BITS),
                 .DATA_BITS(DATA_MEM_DATA_BITS)
             ) lsu_instance (
                 .clk(clk),
