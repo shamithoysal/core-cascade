@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # 1. Configuration for your specific frame
-WIDTH = 64
-HEIGHT = 48
+WIDTH = 640
+HEIGHT = 480
 TOTAL_PIXELS = WIDTH * HEIGHT
 
 pixels = []
@@ -35,13 +35,13 @@ elif len(pixels) > TOTAL_PIXELS:
     # Trim to exactly 64x48 if Vivado dumped extra memory addresses
     pixels = pixels[:TOTAL_PIXELS]
 
-# 3. Reshape the 1D list into a 48x64 2D Numpy grid [2]
+# 3. Reshape the 1D list into a 480x640 2D Numpy grid [2]
 image_data = np.array(pixels).reshape((HEIGHT, WIDTH))
 
 print("Rendering image...")
 
 # 4. Plot the Image using Matplotlib [3]
-plt.figure(figsize=(8, 6))
+plt.figure(figsize=(12, 9))
 
 # plt.imshow displays the 2D array as an image. 
 # 'magma' is a great colormap for fractals, mapping low iterations to dark colors and high to bright.
@@ -49,7 +49,7 @@ plt.imshow(image_data, cmap='magma', interpolation='nearest')
 
 # Add a colorbar on the side to show what iteration count each color represents [4]
 plt.colorbar(label='Iterations to Escape')
-plt.title('Custom GPU Rendered Mandelbrot Set (64x48)')
+plt.title('Custom GPU Rendered Mandelbrot Set (640x480)')
 plt.axis('off') # Hide the X/Y axes ticks for a cleaner look
 
 # Display the window!

@@ -19,7 +19,7 @@ module decoder (
     output reg decoded_nzp_write_enable,
     output reg [1:0] decoded_reg_input_mux,
     
-    // UPDATE 1: Widen this signal to 3 bits to match Shamit's ALU
+    // UPDATE 1: Widen this signal to 3 bits
     output reg [2:0] decoded_alu_arithmetic_mux, 
     
     output reg decoded_alu_output_mux,
