@@ -120,7 +120,7 @@ module tb_gpu;
         // Disptach 307200 threads (640x480 resolution)
         @(posedge clk);
         device_control_write_enable = 1;
-        device_control_data = 32'd307200; // 640 x 480 threads
+        device_control_data = 32'd3072; // 64 x 48 threads
         @(posedge clk);
         device_control_write_enable = 0;
 
@@ -134,7 +134,7 @@ module tb_gpu;
                 wait (done);
                 $display("GPU execution finished successfully at time %0t.", $time);
                 // DUMP THE FRAMEBUFFER TO HEX FILE -- Dump exactly 307,200 pixels (Addresses 10 to 307209)
-                $writememh("output_frame.hex", data_mem, 10, 307209);
+                $writememh("output_frame.hex", data_mem, 10, 3081);
                 $display("Frame saved to output_frame.hex!");
             end
             begin

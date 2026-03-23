@@ -1,0 +1,6 @@
+# Force LF for hex files so Verilator doesn't crash
+*.hex text eol=lf
+
+# Also good to keep Verilog files as LF
+*.v text eol=lf
+*.sv text eol=lf
