@@ -12,6 +12,10 @@ module gpu_system (
     input wire [18:0] host_read_address,
     output logic [31:0] host_read_data,
 
+    input wire host_write_enable,
+    input wire [18:0] host_write_address,
+    input wire [31:0] host_write_data,
+
     // Debug X-Ray Ports
     output wire [7:0] current_pc,
     output wire [2:0] core_state,
@@ -60,10 +64,6 @@ module gpu_system (
         $readmemh("/mnt/d/Data/CoreCascade/core-cascade/test/program_mem.hex", program_mem);
         $readmemh("/mnt/d/Data/CoreCascade/core-cascade/test/data_mem.hex", data_mem);
 
-        // HARD OVERRIDE FOR FULL SCALE
-        data_mem[2] = 32'h00013333; // DX (High-res step)
-        data_mem[3] = 32'h00011111; // DY (High-res step)
-        data_mem[6] = 32'h00000280; // Width = 640
     end
 
     always_comb begin
@@ -76,5 +76,7 @@ module gpu_system (
             if (d_write_valid[i]) data_mem[d_write_addr[i]] <= d_write_data[i];
         end
         host_read_data <= data_mem[host_read_address];
+        if (host_write_enable) data_mem[host_write_address] <= host_write_data;
     end
+    
 endmodule
