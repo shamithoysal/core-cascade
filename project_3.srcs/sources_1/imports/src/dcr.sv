@@ -1,0 +1,28 @@
+`default_nettype none
+`timescale 1ns/1ns
+
+// DEVICE CONTROL REGISTER
+// > Used to configure high-level settings
+// > In this minimal example, the DCR is used to configure the number of threads to run for the kernel
+module dcr (
+    input wire clk,
+    input wire reset,
+
+    input wire device_control_write_enable,
+    input wire [31:0] device_control_data, // Expanded
+    output wire [31:0] thread_count // Expanded
+);
+    // Store device control data in dedicated register
+    reg [31:0] device_conrol_register; // Expanded
+    assign thread_count = device_conrol_register; //BUG FIXED
+
+    always @(posedge clk) begin
+        if (reset) begin
+            device_conrol_register <= 32'b0;
+        end else begin
+            if (device_control_write_enable) begin 
+                device_conrol_register <= device_control_data;
+            end
+        end
+    end
+endmodule
