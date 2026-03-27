@@ -59,7 +59,8 @@ module alu (
                         SLL: alu_out_reg <= rs << rt[4:0];
                         SRL: alu_out_reg <= rs >> rt[4:0];
                         SRA: alu_out_reg <= rs >>> rt[4:0];
-                        DIV: alu_out_reg <= rs / rt;
+                        DIV: alu_out_reg <= 32'hDEADBEEF;
+                        
                     endcase
                 end
             end
