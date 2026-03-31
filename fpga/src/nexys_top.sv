@@ -8,7 +8,14 @@ module nexys_top (
     output wire [7:0] anode,
     output wire [7:0] cathode,
     output wire led15,  // DONE indicator
-    output wire led14
+    output wire led14,
+    
+    // Physical VGA Pins
+    output wire [3:0] VGA_R,
+    output wire [3:0] VGA_G,
+    output wire [3:0] VGA_B,
+    output wire VGA_HS,
+    output wire VGA_VS
 );
 
     wire gpu_done;
@@ -30,16 +37,16 @@ module nexys_top (
                 IDLE: begin
                     if (btnC) begin
                         state <= RUNNING;
-                        gpu_start <= 1; // Pulse start
+                        gpu_start <= 1;
                     end
                 end
                 RUNNING: begin
-                    gpu_start <= 0; // Turn off start pulse
+                    gpu_start <= 0;
                     cycle_counter <= cycle_counter + 1;
                     if (gpu_done) state <= DONE;
                 end
                 DONE: begin
-                    // Freeze counter, wait for reset
+                    // Freeze counter
                 end
             endcase
         end
@@ -48,16 +55,22 @@ module nexys_top (
     assign led15 = (state == DONE);
     assign led14 = ^dummy_pixel_data;
 
-    // Instantiate GPU
+    // Map the 12-bit color to the physical pins
+    wire [11:0] top_vga_color;
+    assign {VGA_R, VGA_G, VGA_B} = top_vga_color;
+
     fpga_gpu_sys system (
         .clk(clk_100mhz),
         .reset(btnU),
         .start(gpu_start),
         .done(gpu_done),
-        .debug_pixel_out(dummy_pixel_data)
+        .debug_pixel_out(dummy_pixel_data),
+        
+        .vga_color_out(top_vga_color),
+        .hsync(VGA_HS),
+        .vsync(VGA_VS)
     );
 
-    // Instantiate 7-Segment
     seven_seg display (
         .clk(clk_100mhz),
         .data(cycle_counter),

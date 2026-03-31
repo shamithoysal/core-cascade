@@ -22,7 +22,6 @@ module seven_seg (
     end
 
     always @(*) begin
-        // Active-low segment mapping
         case(hex_val)
             4'h0: cathode = 8'hC0; 4'h1: cathode = 8'hF9;
             4'h2: cathode = 8'hA4; 4'h3: cathode = 8'hB0;
@@ -37,6 +36,6 @@ module seven_seg (
 
     always @(*) begin
         anode = 8'hFF; 
-        anode[digit] = 1'b0; // Active-low digit select
+        anode[digit] = 1'b0; 
     end
 endmodule

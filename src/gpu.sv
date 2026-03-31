@@ -2,9 +2,9 @@
 `timescale 1ns/1ns
 
 module gpu #(
-    parameter DATA_MEM_ADDR_BITS = 8,
+    parameter DATA_MEM_ADDR_BITS = 19,
     parameter DATA_MEM_DATA_BITS = 32, // Fixed Point 32-bit
-    parameter DATA_MEM_NUM_CHANNELS = 4,
+    parameter DATA_MEM_NUM_CHANNELS = 1,
     parameter PROGRAM_MEM_ADDR_BITS = 8,
     parameter PROGRAM_MEM_DATA_BITS = 16,
     parameter PROGRAM_MEM_NUM_CHANNELS = 1,
