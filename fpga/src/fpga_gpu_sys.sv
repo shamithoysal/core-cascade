@@ -5,6 +5,12 @@ module fpga_gpu_sys (
     input wire clk,
     input wire reset,
     input wire start,
+
+    // --- NEW INTERACTIVE PORTS ---
+    input wire btnC_pulse, btnU_pulse, btnD_pulse, btnL_pulse, btnR_pulse,
+    input wire sw0_sync,   // Zoom Mode (0: In, 1: Out)
+    input wire sw15_sync,  // Reset
+
     output wire done,
     output wire [31:0] debug_pixel_out,
     
@@ -26,11 +32,67 @@ module fpga_gpu_sys (
         p_read_data[0] = program_mem[p_read_addr[0]];
     end
 
-    // --- 2. CONFIGURATION REGISTERS ---
+    // --- 2. DYNAMIC CONFIGURATION & UNIFIED BOOT CONTROLLER ---
     reg [31:0] config_regs [0:7];
-    initial $readmemh("config_regs.hex", config_regs);
+    
+    // Wires for the Navigation Shadow Registers
+    wire [31:0] shadow_x, shadow_y, shadow_dx, shadow_dy;
+    wire nav_done;
 
-    // --- 3. THE FRAMEBUFFER (1-Channel Monolithic BRAM) ---
+    navigation_ctrl nav_unit (
+        .clk(clk),
+        .reset(reset || sw15_sync),
+        .btn_u(btnU_pulse), .btn_d(btnD_pulse), .btn_l(btnL_pulse), .btn_r(btnR_pulse), .btn_c(btnC_pulse),
+        .zoom_mode(sw0_sync),
+        .curr_x(config_regs[0]), .curr_y(config_regs[1]),
+        .curr_dx(config_regs[2]), .curr_dy(config_regs[3]),
+        .next_x(shadow_x), .next_y(shadow_y), .next_dx(shadow_dx), .next_dy(shadow_dy),
+        .done(nav_done)
+    );
+
+    // Unified Boot State Machine
+    reg nav_pending = 0;
+    reg [2:0] sys_state = 3'd0; 
+
+    always_ff @(posedge clk) begin
+        if (reset || sw15_sync) begin
+            // --- THE FIX: Centered starting coordinates ---
+            config_regs[0] <= 32'hFD400000; // X_START = -2.75 
+            config_regs[1] <= 32'hFE800000; // Y_START = -1.5 
+            config_regs[2] <= 32'h00014CCC; // DX = 0.005
+            config_regs[3] <= 32'h00014CCC; // DY = 0.005
+            config_regs[4] <= 32'd255;      // MAX_ITER
+            config_regs[5] <= 32'h04000000; // ESC_RADIUS = 4.0
+            config_regs[6] <= 32'd800;      // SCREEN_WIDTH
+            config_regs[7] <= 32'h000051EC; // RECIPROCAL (1/800)
+            
+            nav_pending <= 0;
+            sys_state <= 3'd0; 
+        end else begin
+            if (nav_done) nav_pending <= 1;
+
+            if (sys_state == 3'd4) begin
+                if (nav_pending && vsync) begin
+                    config_regs[0] <= shadow_x;
+                    config_regs[1] <= shadow_y;
+                    config_regs[2] <= shadow_dx;
+                    config_regs[3] <= shadow_dy;
+                    nav_pending <= 0;
+                    
+                    sys_state <= 3'd0; // KICK OFF REBOOT SEQUENCE
+                end
+            end else begin
+                sys_state <= sys_state + 1;
+            end
+        end
+    end
+
+    wire combined_reset = (sys_state == 3'd0) || (sys_state == 3'd1);
+    wire auto_we        = (sys_state == 3'd2);
+    wire combined_start = (sys_state == 3'd3) || start;
+
+
+    // --- 3. THE FRAMEBUFFER (BRAM) ---
     logic [0:0] d_write_valid;
     logic [0:0] d_read_valid; 
     logic [18:0] d_read_addr [0:0];
@@ -81,7 +143,7 @@ module fpga_gpu_sys (
     
     vga_controller vga_ctrl (
         .clk_40MHz(clk_40mhz),
-        .reset(reset),
+        .reset(reset || sw15_sync),
         .hsync(hsync_raw),
         .vsync(vsync_raw),
         .video_on(video_on_raw),
@@ -103,6 +165,7 @@ module fpga_gpu_sys (
 
     wire [19:0] pixel_index = (vga_y * 800) + vga_x; 
 
+    // Assuming you kept your color mapper separate as discussed!
     wire [11:0] mapped_color;
     color_mapper cmap (
         .iter_count(video_on_d ? bram_portb_out : 8'h00),
@@ -111,18 +174,7 @@ module fpga_gpu_sys (
 
     assign vga_color_out = video_on_d ? mapped_color : 12'h000;
 
-    // --- 5. AUTOLOADER FOR DCR ---
-    reg [1:0] boot_state = 0;
-    always_ff @(posedge clk) begin
-        if (reset) begin
-            boot_state <= 0;
-        end else if (boot_state < 2) begin
-            boot_state <= boot_state + 1;
-        end
-    end
-    wire auto_we = (boot_state == 2'd1);
-
-    // --- 6. THE GPU CORE ---
+    // --- 5. THE GPU CORE ---
     gpu #(
         .DATA_MEM_ADDR_BITS(19), 
         .DATA_MEM_DATA_BITS(32), 
@@ -131,7 +183,10 @@ module fpga_gpu_sys (
         .PROGRAM_MEM_DATA_BITS(16), 
         .PROGRAM_MEM_NUM_CHANNELS(1)
     ) core (
-        .clk(clk), .reset(reset), .start(start), .done(done),
+        .clk(clk), 
+        .reset(combined_reset), 
+        .start(combined_start), 
+        .done(done),
         
         .device_control_write_enable(auto_we), 
         .device_control_data(32'd480000),  
