@@ -20,17 +20,23 @@ module fpga_gpu_sys (
     output wire vsync
 );
 
-    // --- 1. PROGRAM MEMORY (ROM) ---
+    // --- 1. PROGRAM MEMORY (ROM) - MULTI-PORTED FIX ---
     (* ram_style = "distributed" *) reg [15:0] program_mem [0:255];
     initial $readmemh("program_mem.hex", program_mem);
     
-    logic [7:0] p_read_addr [0:0]; 
-    logic [15:0] p_read_data [0:0]; 
-    logic [0:0] p_read_valid; 
+    // 8 independent channels so 8 cores can read simultaneously
+    logic [7:0] p_read_addr [7:0]; 
+    logic [15:0] p_read_data [7:0]; 
+    logic [7:0] p_read_valid; 
         
-    always_comb begin
-        p_read_data[0] = program_mem[p_read_addr[0]];
-    end
+    genvar i;
+    generate
+        for (i = 0; i < 8; i = i + 1) begin : rom_ports
+            always_comb begin
+                p_read_data[i] = program_mem[p_read_addr[i]];
+            end
+        end
+    endgenerate
 
     // --- 2. DYNAMIC CONFIGURATION & UNIFIED BOOT CONTROLLER ---
     reg [31:0] config_regs [0:7];
@@ -56,7 +62,6 @@ module fpga_gpu_sys (
 
     always_ff @(posedge clk) begin
         if (reset || sw15_sync) begin
-            // --- THE FIX: Centered starting coordinates ---
             config_regs[0] <= 32'hFD400000; // X_START = -2.75 
             config_regs[1] <= 32'hFE800000; // Y_START = -1.5 
             config_regs[2] <= 32'h00014CCC; // DX = 0.005
@@ -140,10 +145,17 @@ module fpga_gpu_sys (
 
     wire video_on_raw, hsync_raw, vsync_raw;
     wire [10:0] vga_x, vga_y;
+
+    // CDC FIX: Synchronize the 100MHz reset into the 40MHz domain safely
+    reg vga_rst_meta, vga_rst_sync;
+    always_ff @(posedge clk_40mhz) begin
+        vga_rst_meta <= (reset || sw15_sync);
+        vga_rst_sync <= vga_rst_meta;
+    end
     
     vga_controller vga_ctrl (
         .clk_40MHz(clk_40mhz),
-        .reset(reset || sw15_sync),
+        .reset(vga_rst_sync), // Feed the safe signal here
         .hsync(hsync_raw),
         .vsync(vsync_raw),
         .video_on(video_on_raw),
@@ -165,7 +177,6 @@ module fpga_gpu_sys (
 
     wire [19:0] pixel_index = (vga_y * 800) + vga_x; 
 
-    // Assuming you kept your color mapper separate as discussed!
     wire [11:0] mapped_color;
     color_mapper cmap (
         .iter_count(video_on_d ? bram_portb_out : 8'h00),
@@ -181,7 +192,8 @@ module fpga_gpu_sys (
         .DATA_MEM_NUM_CHANNELS(1), 
         .PROGRAM_MEM_ADDR_BITS(8), 
         .PROGRAM_MEM_DATA_BITS(16), 
-        .PROGRAM_MEM_NUM_CHANNELS(1)
+        .PROGRAM_MEM_NUM_CHANNELS(8), // UPGRADED TO 8
+        .NUM_CORES(8)
     ) core (
         .clk(clk), 
         .reset(combined_reset), 
@@ -191,8 +203,10 @@ module fpga_gpu_sys (
         .device_control_write_enable(auto_we), 
         .device_control_data(32'd480000),  
         
-        .program_mem_read_valid(p_read_valid), .program_mem_read_address(p_read_addr), 
-        .program_mem_read_ready(1'b1), .program_mem_read_data(p_read_data),
+        .program_mem_read_valid(p_read_valid), 
+        .program_mem_read_address(p_read_addr), 
+        .program_mem_read_ready(8'hFF), // Force ready high for all 8 channels
+        .program_mem_read_data(p_read_data),
         
         .data_mem_read_valid(d_read_valid), .data_mem_read_address(d_read_addr), 
         .data_mem_read_ready(d_read_ready_delayed), .data_mem_read_data(final_read_data), 

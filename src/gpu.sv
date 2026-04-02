@@ -20,7 +20,7 @@ module gpu #(
     
     // Device Control Register
     input wire device_control_write_enable,
-    input wire [31:0] device_control_data, // Expanded
+    input wire [31:0] device_control_data,
     
     // Program Memory
     output wire [PROGRAM_MEM_NUM_CHANNELS-1:0] program_mem_read_valid,
@@ -42,19 +42,19 @@ module gpu #(
     output wire [7:0] current_pc,
     output wire [2:0] core_state,
     output wire decoded_ret,
-    output wire [31:0] blocks_dispatched, // Expanded
-    output wire [31:0] blocks_done // Expanded
+    output wire [31:0] blocks_dispatched, 
+    output wire [31:0] blocks_done 
 );
 
     // Control
-    wire [31:0] thread_count; // Expanded
+    wire [31:0] thread_count; 
 
     // Compute Core State
-    reg [NUM_CORES-1:0] core_start;
-    reg [NUM_CORES-1:0] core_reset;
-    wire [NUM_CORES-1:0] core_done; // Must be wire
-    reg [31:0] core_block_id [NUM_CORES-1:0]; // Expanded
-    reg [$clog2(THREADS_PER_BLOCK):0] core_thread_count [NUM_CORES-1:0];
+    wire [NUM_CORES-1:0] core_done; 
+    wire [NUM_CORES-1:0] core_start;
+    wire [NUM_CORES-1:0] core_reset;
+    wire [31:0] core_block_id [NUM_CORES-1:0]; 
+    wire [$clog2(THREADS_PER_BLOCK):0] core_thread_count [NUM_CORES-1:0];
 
     // LSU <> Data Memory Controller Channels
     localparam NUM_LSUS = NUM_CORES * THREADS_PER_BLOCK;
@@ -67,14 +67,14 @@ module gpu #(
     reg [DATA_MEM_DATA_BITS-1:0] lsu_write_data [NUM_LSUS-1:0];
     reg [NUM_LSUS-1:0] lsu_write_ready;
 
-    // Fetcher <> Program Memory Controller Channels
+    // Fetcher <> Program Memory Channels (Changed to wires for direct assignment)
     localparam NUM_FETCHERS = NUM_CORES;
-    reg [NUM_FETCHERS-1:0] fetcher_read_valid;
-    reg [PROGRAM_MEM_ADDR_BITS-1:0] fetcher_read_address [NUM_FETCHERS-1:0];
-    reg [NUM_FETCHERS-1:0] fetcher_read_ready;
-    reg [PROGRAM_MEM_DATA_BITS-1:0] fetcher_read_data [NUM_FETCHERS-1:0];
+    wire [NUM_FETCHERS-1:0] fetcher_read_valid;
+    wire [PROGRAM_MEM_ADDR_BITS-1:0] fetcher_read_address [NUM_FETCHERS-1:0];
+    wire [NUM_FETCHERS-1:0] fetcher_read_ready;
+    wire [PROGRAM_MEM_DATA_BITS-1:0] fetcher_read_data [NUM_FETCHERS-1:0];
 
-    // DEBUG ARRAYS (PC is 8-bit to match core.sv)
+    // DEBUG ARRAYS
     wire [7:0] debug_pc_signals [NUM_CORES-1:0]; 
     wire [2:0] debug_core_state_signals [NUM_CORES-1:0];
     wire [NUM_CORES-1:0] debug_decoded_ret_signals;
@@ -88,7 +88,7 @@ module gpu #(
         .thread_count(thread_count)
     );
 
-    // Data Memory Controller
+    // Data Memory Controller (Kept intact for BRAM writes)
     controller #(
         .ADDR_BITS(DATA_MEM_ADDR_BITS),
         .DATA_BITS(DATA_MEM_DATA_BITS),
@@ -115,25 +115,17 @@ module gpu #(
         .mem_write_ready(data_mem_write_ready)
     );
 
-    // Program Memory Controller
-    controller #(
-        .ADDR_BITS(PROGRAM_MEM_ADDR_BITS),
-        .DATA_BITS(PROGRAM_MEM_DATA_BITS),
-        .NUM_CONSUMERS(NUM_FETCHERS),
-        .NUM_CHANNELS(PROGRAM_MEM_NUM_CHANNELS),
-        .WRITE_ENABLE(0)
-    ) program_memory_controller (
-        .clk(clk),
-        .reset(reset),
-        .consumer_read_valid(fetcher_read_valid),
-        .consumer_read_address(fetcher_read_address),
-        .consumer_read_ready(fetcher_read_ready),
-        .consumer_read_data(fetcher_read_data),
-        .mem_read_valid(program_mem_read_valid),
-        .mem_read_address(program_mem_read_address),
-        .mem_read_ready(program_mem_read_ready),
-        .mem_read_data(program_mem_read_data)
-    );
+    // --- BYPASS CONTROLLER: Direct 1-to-1 wiring for 8 Cores to 8 ROM Ports ---
+    assign program_mem_read_valid = fetcher_read_valid;
+    assign fetcher_read_ready = program_mem_read_ready;
+
+    genvar p;
+    generate
+        for (p = 0; p < NUM_CORES; p = p + 1) begin : rom_bypass
+            assign program_mem_read_address[p] = fetcher_read_address[p];
+            assign fetcher_read_data[p] = program_mem_read_data[p];
+        end
+    endgenerate
 
     // Dispatcher
     dispatch #(
@@ -208,7 +200,7 @@ module gpu #(
                 .data_mem_write_data(core_lsu_write_data),
                 .data_mem_write_ready(core_lsu_write_ready),
                 
-                // Debug signal connections to unpacked array
+                // Debug signal connections
                 .current_pc_debug(debug_pc_signals[i]),
                 .core_state_debug(debug_core_state_signals[i]),
                 .decoded_ret_debug(debug_decoded_ret_signals[i])
@@ -216,9 +208,6 @@ module gpu #(
         end
     endgenerate
 
-    // -------------------------------------------------------------
-    // ASSIGN DEBUG PORTS (Select Core 0)
-    // -------------------------------------------------------------
     assign current_pc = debug_pc_signals[0];
     assign core_state = debug_core_state_signals[0];
     assign decoded_ret = debug_decoded_ret_signals[0];
