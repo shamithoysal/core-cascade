@@ -1,13 +1,6 @@
-# ==============================================================================
-# 100 MHz System Clock (Same on both boards)
-# ==============================================================================
 set_property -dict { PACKAGE_PIN E3    IOSTANDARD LVCMOS33 } [get_ports { clk_100mhz }];
-create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports {clk_100mhz}];
 
-# ==============================================================================
-# Switches (16 total - COMPLETELY DIFFERENT PINS)
-# ==============================================================================
-set_property -dict { PACKAGE_PIN U9    IOSTANDARD LVCMOS33 } [get_ports { sw[0] }];  # Zoom Mode
+set_property -dict { PACKAGE_PIN U9    IOSTANDARD LVCMOS33 } [get_ports { sw[0] }];
 set_property -dict { PACKAGE_PIN U8    IOSTANDARD LVCMOS33 } [get_ports { sw[1] }];
 set_property -dict { PACKAGE_PIN R7    IOSTANDARD LVCMOS33 } [get_ports { sw[2] }];
 set_property -dict { PACKAGE_PIN R6    IOSTANDARD LVCMOS33 } [get_ports { sw[3] }];
@@ -22,28 +15,18 @@ set_property -dict { PACKAGE_PIN T3    IOSTANDARD LVCMOS33 } [get_ports { sw[11]
 set_property -dict { PACKAGE_PIN T1    IOSTANDARD LVCMOS33 } [get_ports { sw[12] }];
 set_property -dict { PACKAGE_PIN R3    IOSTANDARD LVCMOS33 } [get_ports { sw[13] }];
 set_property -dict { PACKAGE_PIN P3    IOSTANDARD LVCMOS33 } [get_ports { sw[14] }];
-set_property -dict { PACKAGE_PIN P4    IOSTANDARD LVCMOS33 } [get_ports { sw[15] }]; # Reset
+set_property -dict { PACKAGE_PIN P4    IOSTANDARD LVCMOS33 } [get_ports { sw[15] }];
 
-# ==============================================================================
-# Buttons (D-Pad + Center - COMPLETELY DIFFERENT PINS)
-# ==============================================================================
-set_property -dict { PACKAGE_PIN E16   IOSTANDARD LVCMOS33 } [get_ports { btnC }]; # Zoom
-set_property -dict { PACKAGE_PIN F15   IOSTANDARD LVCMOS33 } [get_ports { btnU }]; # Pan Up
-set_property -dict { PACKAGE_PIN V10   IOSTANDARD LVCMOS33 } [get_ports { btnD }]; # Pan Down
-set_property -dict { PACKAGE_PIN T16   IOSTANDARD LVCMOS33 } [get_ports { btnL }]; # Pan Left
-set_property -dict { PACKAGE_PIN R10   IOSTANDARD LVCMOS33 } [get_ports { btnR }]; # Pan Right
+set_property -dict { PACKAGE_PIN E16   IOSTANDARD LVCMOS33 } [get_ports { btnC }];
+set_property -dict { PACKAGE_PIN F15   IOSTANDARD LVCMOS33 } [get_ports { btnU }];
+set_property -dict { PACKAGE_PIN V10   IOSTANDARD LVCMOS33 } [get_ports { btnD }];
+set_property -dict { PACKAGE_PIN T16   IOSTANDARD LVCMOS33 } [get_ports { btnL }];
+set_property -dict { PACKAGE_PIN R10   IOSTANDARD LVCMOS33 } [get_ports { btnR }];
 
-# ==============================================================================
-# LEDs (COMPLETELY DIFFERENT PINS)
-# ==============================================================================
-set_property -dict { PACKAGE_PIN T8    IOSTANDARD LVCMOS33 } [get_ports { led0 }];  # Zoom OUT active
-set_property -dict { PACKAGE_PIN P5    IOSTANDARD LVCMOS33 } [get_ports { led14 }]; # Dummy pixel
-set_property -dict { PACKAGE_PIN U1    IOSTANDARD LVCMOS33 } [get_ports { led15 }]; # GPU Done Flag
+set_property -dict { PACKAGE_PIN T8    IOSTANDARD LVCMOS33 } [get_ports { led0 }];
+set_property -dict { PACKAGE_PIN P5    IOSTANDARD LVCMOS33 } [get_ports { led14 }];
+set_property -dict { PACKAGE_PIN U1    IOSTANDARD LVCMOS33 } [get_ports { led15 }];
 
-# ==============================================================================
-# 7-Segment Display (COMPLETELY DIFFERENT PINS)
-# ==============================================================================
-# Cathodes (Segments A-G, DP)
 set_property -dict { PACKAGE_PIN L3    IOSTANDARD LVCMOS33 } [get_ports { cathode[0] }]; 
 set_property -dict { PACKAGE_PIN N1    IOSTANDARD LVCMOS33 } [get_ports { cathode[1] }]; 
 set_property -dict { PACKAGE_PIN L5    IOSTANDARD LVCMOS33 } [get_ports { cathode[2] }]; 
@@ -53,7 +36,6 @@ set_property -dict { PACKAGE_PIN M2    IOSTANDARD LVCMOS33 } [get_ports { cathod
 set_property -dict { PACKAGE_PIN L6    IOSTANDARD LVCMOS33 } [get_ports { cathode[6] }]; 
 set_property -dict { PACKAGE_PIN M4    IOSTANDARD LVCMOS33 } [get_ports { cathode[7] }]; 
 
-# Anodes (Digit Selects)
 set_property -dict { PACKAGE_PIN N6    IOSTANDARD LVCMOS33 } [get_ports { anode[0] }];
 set_property -dict { PACKAGE_PIN M6    IOSTANDARD LVCMOS33 } [get_ports { anode[1] }];
 set_property -dict { PACKAGE_PIN M3    IOSTANDARD LVCMOS33 } [get_ports { anode[2] }];
@@ -63,9 +45,6 @@ set_property -dict { PACKAGE_PIN N4    IOSTANDARD LVCMOS33 } [get_ports { anode[
 set_property -dict { PACKAGE_PIN L1    IOSTANDARD LVCMOS33 } [get_ports { anode[6] }];
 set_property -dict { PACKAGE_PIN M1    IOSTANDARD LVCMOS33 } [get_ports { anode[7] }];
 
-# ==============================================================================
-# VGA Display Output (Same on both boards)
-# ==============================================================================
 set_property -dict { PACKAGE_PIN A3    IOSTANDARD LVCMOS33 } [get_ports { VGA_R[0] }];
 set_property -dict { PACKAGE_PIN B4    IOSTANDARD LVCMOS33 } [get_ports { VGA_R[1] }];
 set_property -dict { PACKAGE_PIN C5    IOSTANDARD LVCMOS33 } [get_ports { VGA_R[2] }];
@@ -83,3 +62,5 @@ set_property -dict { PACKAGE_PIN D8    IOSTANDARD LVCMOS33 } [get_ports { VGA_B[
 
 set_property -dict { PACKAGE_PIN B11   IOSTANDARD LVCMOS33 } [get_ports { VGA_HS }];
 set_property -dict { PACKAGE_PIN B12   IOSTANDARD LVCMOS33 } [get_ports { VGA_VS }];
+
+set_clock_groups -asynchronous -group [get_clocks *clk_out1*] -group [get_clocks *clk_out2*]
