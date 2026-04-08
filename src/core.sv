@@ -189,8 +189,8 @@ module core #(
                 .decoded_rd_address(decoded_rd_address),
                 .decoded_rs_address(decoded_rs_address),
                 .decoded_rt_address(decoded_rt_address),
-                // FIX: Zero-extend 8-bit immediate to 32-bit input for registers
-                .decoded_immediate({ {(DATA_MEM_DATA_BITS-8){1'b0}}, decoded_immediate }),
+                // FIX: Sign-extend 8-bit immediate to 32-bit input for registers
+                .decoded_immediate({ {(DATA_MEM_DATA_BITS-8){decoded_immediate[7]}}, decoded_immediate }),
                 .alu_out(alu_out[i]),
                 .lsu_out(lsu_out[i]),
                 .rs(rs[i]),
@@ -207,8 +207,8 @@ module core #(
                 .enable(i < thread_count),
                 .core_state(core_state),
                 .decoded_nzp(decoded_nzp),
-                // FIX: Zero-extend 8-bit immediate for PC module
-                .decoded_immediate({ {(DATA_MEM_DATA_BITS-8){1'b0}}, decoded_immediate }),
+                // FIX: Sign-extend 8-bit immediate for PC module
+                .decoded_immediate({ {(DATA_MEM_DATA_BITS-8){decoded_immediate[7]}}, decoded_immediate }),
                 .decoded_nzp_write_enable(decoded_nzp_write_enable),
                 .decoded_pc_mux(decoded_pc_mux),
                 .alu_out(alu_out[i]),
