@@ -21,7 +21,6 @@ module controller #(
     input  wire [DATA_BITS-1:0] consumer_write_data [NUM_CONSUMERS-1:0],
     output reg  [NUM_CONSUMERS-1:0] consumer_write_ready,
 
-    // Even though these are arrays, they will only ever have 1 index ([0])
     output reg  [NUM_CHANNELS-1:0] mem_read_valid,
     output reg  [ADDR_BITS-1:0] mem_read_address [NUM_CHANNELS-1:0],
     input  wire [NUM_CHANNELS-1:0] mem_read_ready,
@@ -42,103 +41,130 @@ module controller #(
     reg [2:0] controller_state [NUM_CHANNELS-1:0];
     reg [$clog2(NUM_CONSUMERS)-1:0] current_consumer [NUM_CHANNELS-1:0];
     reg [NUM_CONSUMERS-1:0] channel_serving_consumer;
+    
+    
+    reg [$clog2(NUM_CONSUMERS)-1:0] rr_ptr;
 
-    integer i, j;
+    integer i, j, count;
 
     always @(posedge clk) begin
-        if (reset) begin
-            mem_read_valid       <= '0;
-            mem_write_valid      <= '0;
-            consumer_read_ready  <= '0;
-            consumer_write_ready <= '0;
-            channel_serving_consumer <= '0;
+        case (reset)
+            1'b1: begin
+                mem_read_valid       <= '0;
+                mem_write_valid      <= '0;
+                consumer_read_ready  <= '0;
+                consumer_write_ready <= '0;
+                channel_serving_consumer <= '0;
+                rr_ptr               <= '0;
 
-            for (i = 0; i < NUM_CHANNELS; i = i + 1) begin
-                mem_read_address[i]  <= '0;
-                mem_write_address[i] <= '0;
-                mem_write_data[i]    <= '0;
-                current_consumer[i]  <= '0;
-                controller_state[i]  <= IDLE;
+                for (i = 0; i < NUM_CHANNELS; i = i + 1) begin
+                    mem_read_address[i]  <= '0;
+                    mem_write_address[i] <= '0;
+                    mem_write_data[i]    <= '0;
+                    current_consumer[i]  <= '0;
+                    controller_state[i]  <= IDLE;
+                end
+
+                for (j = 0; j < NUM_CONSUMERS; j = j + 1) begin
+                    consumer_read_data[j] <= '0;
+                end
             end
+            
+            1'b0: begin
+                for (i = 0; i < NUM_CHANNELS; i = i + 1) begin
+                    case (controller_state[i])
+                        IDLE: begin
+                            reg found;
+                            found = 0;
 
-            for (j = 0; j < NUM_CONSUMERS; j = j + 1) begin
-                consumer_read_data[j] <= '0;
-            end
-        end
-        else begin
-            for (i = 0; i < NUM_CHANNELS; i = i + 1) begin
+                            for (count = 0; count < NUM_CONSUMERS; count = count + 1) begin
+                                j = (rr_ptr + count) % NUM_CONSUMERS;
 
-                case (controller_state[i])
+                                case (found)
+                                    1'b0: begin
+                                        case ({consumer_read_valid[j], channel_serving_consumer[j]})
+                                            2'b10: begin 
+                                                channel_serving_consumer[j] <= 1'b1;
+                                                current_consumer[i]         <= j;
 
-                    IDLE: begin
-                        reg found;
-                        found = 0;
+                                                mem_read_valid[i]           <= 1'b1;
+                                                mem_read_address[i]         <= consumer_read_address[j];
+                                                controller_state[i]         <= READ_WAITING;
+                                                
+                                                rr_ptr <= j + 1; 
+                                                found = 1;
+                                            end
+                                            default: begin
+                                                case ({(WRITE_ENABLE != 0), consumer_write_valid[j], channel_serving_consumer[j]})
+                                                    3'b110: begin 
+                                                        channel_serving_consumer[j] <= 1'b1;
+                                                        current_consumer[i]         <= j;
 
-                        for (j = 0; j < NUM_CONSUMERS; j = j + 1) begin
-                            if (!found) begin
-
-                                // PURE ARBITER: First come, first served. Direct address pass-through.
-                                if (consumer_read_valid[j] && !channel_serving_consumer[j]) begin
-                                    channel_serving_consumer[j] <= 1'b1;
-                                    current_consumer[i]         <= j;
-
-                                    mem_read_valid[i]           <= 1'b1;
-                                    mem_read_address[i]         <= consumer_read_address[j]; // DIRECT PASS
-                                    controller_state[i]         <= READ_WAITING;
-
-                                    found = 1;
-                                end
-                                
-                                else if (WRITE_ENABLE && consumer_write_valid[j] && !channel_serving_consumer[j]) begin
-                                    channel_serving_consumer[j] <= 1'b1;
-                                    current_consumer[i]         <= j;
-
-                                    mem_write_valid[i]          <= 1'b1;
-                                    mem_write_address[i]        <= consumer_write_address[j]; // DIRECT PASS
-                                    mem_write_data[i]           <= consumer_write_data[j];    // DIRECT PASS
-                                    controller_state[i]         <= WRITE_WAITING;
-
-                                    found = 1;
-                                end
+                                                        mem_write_valid[i]          <= 1'b1;
+                                                        mem_write_address[i]        <= consumer_write_address[j];
+                                                        mem_write_data[i]           <= consumer_write_data[j]; 
+                                                        controller_state[i]         <= WRITE_WAITING;
+                                                        
+                                                        rr_ptr <= j + 1; 
+                                                        found = 1;
+                                                    end
+                                                    default: ; 
+                                                endcase
+                                            end
+                                        endcase
+                                    end
+                                    default: ; 
+                                endcase
                             end
                         end
-                    end
 
-                    READ_WAITING: begin
-                        if (mem_read_ready[i]) begin
-                            mem_read_valid[i] <= 1'b0;
-                            consumer_read_ready[current_consumer[i]] <= 1'b1;
-                            consumer_read_data[current_consumer[i]]  <= mem_read_data[i];
-                            controller_state[i] <= READ_RELAYING;
+                        READ_WAITING: begin
+                            case (mem_read_ready[i])
+                                1'b1: begin
+                                    mem_read_valid[i] <= 1'b0;
+                                    consumer_read_ready[current_consumer[i]] <= 1'b1;
+                                    consumer_read_data[current_consumer[i]]  <= mem_read_data[i];
+                                    controller_state[i] <= READ_RELAYING;
+                                end
+                                default: ;
+                            endcase
                         end
-                    end
 
-                    WRITE_WAITING: begin
-                        if (mem_write_ready[i]) begin
-                            mem_write_valid[i] <= 1'b0;
-                            consumer_write_ready[current_consumer[i]] <= 1'b1;
-                            controller_state[i] <= WRITE_RELAYING;
+                        WRITE_WAITING: begin
+                            case (mem_write_ready[i])
+                                1'b1: begin
+                                    mem_write_valid[i] <= 1'b0;
+                                    consumer_write_ready[current_consumer[i]] <= 1'b1;
+                                    controller_state[i] <= WRITE_RELAYING;
+                                end
+                                default: ;
+                            endcase
                         end
-                    end
 
-                    READ_RELAYING: begin
-                        if (!consumer_read_valid[current_consumer[i]]) begin
-                            channel_serving_consumer[current_consumer[i]] <= 1'b0;
-                            consumer_read_ready[current_consumer[i]] <= 1'b0;
-                            controller_state[i] <= IDLE;
+                        READ_RELAYING: begin
+                            case (consumer_read_valid[current_consumer[i]])
+                                1'b0: begin
+                                    channel_serving_consumer[current_consumer[i]] <= 1'b0;
+                                    consumer_read_ready[current_consumer[i]] <= 1'b0;
+                                    controller_state[i] <= IDLE;
+                                end
+                                default: ;
+                            endcase
                         end
-                    end
 
-                    WRITE_RELAYING: begin
-                        if (!consumer_write_valid[current_consumer[i]]) begin
-                            channel_serving_consumer[current_consumer[i]] <= 1'b0;
-                            consumer_write_ready[current_consumer[i]] <= 1'b0;
-                            controller_state[i] <= IDLE;
+                        WRITE_RELAYING: begin
+                            case (consumer_write_valid[current_consumer[i]])
+                                1'b0: begin
+                                    channel_serving_consumer[current_consumer[i]] <= 1'b0;
+                                    consumer_write_ready[current_consumer[i]] <= 1'b0;
+                                    controller_state[i] <= IDLE;
+                                end
+                                default: ;
+                            endcase
                         end
-                    end
-
-                endcase
+                    endcase
+                end
             end
-        end
+        endcase
     end
 endmodule

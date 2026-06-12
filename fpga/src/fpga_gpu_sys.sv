@@ -79,7 +79,7 @@ module fpga_gpu_sys (
             if (nav_done) nav_pending <= 1;
 
             if (sys_state == 3'd4) begin
-                if (nav_pending && vsync_safe) begin // USE THE SYNCHRONIZED SIGNAL HERE
+                if (nav_pending && vsync_safe) begin 
                     config_regs[0] <= shadow_x;
                     config_regs[1] <= shadow_y;
                     config_regs[2] <= shadow_dx;
@@ -107,40 +107,44 @@ module fpga_gpu_sys (
     
     logic [31:0] bram_read_data [0:0]; 
     logic [31:0] final_read_data [0:0];
-
-    wire [7:0] bram_dout_8bit; 
-    wire [7:0] bram_portb_out;
     
-    logic [0:0] d_read_ready_delayed; 
+    logic [0:0] d_read_ready_pulse; 
     always_ff @(posedge clk_95mhz) begin
-        d_read_ready_delayed[0] <= d_read_valid[0];
+        // Only assert READY if VALID is high AND we didn't just assert READY last cycle
+        if (d_read_valid[0] && !d_read_ready_pulse[0]) begin
+            d_read_ready_pulse[0] <= 1'b1;
+        end else begin
+            // Force a 1-cycle bubble to protect against back-to-back arbiter grants
+            d_read_ready_pulse[0] <= 1'b0;
+        end
     end
 
-    bram #(
-        .ADDR_WIDTH(19),  
-        .DATA_WIDTH(8)    
+    (* DONT_TOUCH = "TRUE" *) bram #(
+        .ADDR_WIDTH(15),  
+        .DATA_WIDTH(32), 
+        .DEPTH(32768)    
     ) fb_bram (
         .clka(clk_95mhz),
+       
         .wea(d_write_valid[0]),
-        .addra(d_write_valid[0] ? d_write_addr[0][18:0] : d_read_addr[0][18:0]),
-        .dina(d_write_data[0][7:0]), 
-        .douta(bram_dout_8bit),
+        .addra(d_write_valid[0] ? d_write_addr[0][14:0] : d_read_addr[0][14:0]),
+        .dina(d_write_data[0]),           
+        .douta(bram_read_data[0]),        
         
         .clkb(clk_40mhz), 
         .web(1'b0),
-        .addrb(pixel_index[18:0]), 
-        .dinb(8'h0),
-        .doutb(bram_portb_out)
+        .addrb(pixel_index[14:0]), 
+        .dinb(32'h0),                    
+        .doutb()                         
     );
 
-    assign bram_read_data[0] = {24'd0, bram_dout_8bit};
-    assign final_read_data[0] = (d_read_addr[0] < 19'd10) ? config_regs[d_read_addr[0]] : bram_read_data[0];
+
+    assign final_read_data[0] = bram_read_data[0];
 
     // --- 4. VGA DISPLAY SUBSYSTEM ---
     wire video_on_raw, hsync_raw, vsync_raw;
     wire [10:0] vga_x, vga_y;
 
-    // CDC FIX: Bring 95MHz reset safely into the 40MHz domain
     (* ASYNC_REG = "TRUE" *) reg vga_rst_meta, vga_rst_sync;
     always_ff @(posedge clk_40mhz) begin
         vga_rst_meta <= (reset || sw15_sync);
@@ -173,14 +177,14 @@ module fpga_gpu_sys (
 
     wire [11:0] mapped_color;
     color_mapper cmap (
-        .iter_count(video_on_d ? bram_portb_out : 8'h00),
+        .iter_count(8'h00), 
         .vga_color(mapped_color)
     );
 
     assign vga_color_out = video_on_d ? mapped_color : 12'h000;
 
     // --- 5. THE GPU CORE ---
-    gpu #(
+    (* DONT_TOUCH = "TRUE" *) gpu #(
         .DATA_MEM_ADDR_BITS(19), 
         .DATA_MEM_DATA_BITS(32), 
         .DATA_MEM_NUM_CHANNELS(1), 
@@ -195,7 +199,7 @@ module fpga_gpu_sys (
         .done(done),
         
         .device_control_write_enable(auto_we), 
-        .device_control_data(32'd480000),  
+        .device_control_data(32'd1024),  
         
         .program_mem_read_valid(p_read_valid), 
         .program_mem_read_address(p_read_addr), 
@@ -203,7 +207,7 @@ module fpga_gpu_sys (
         .program_mem_read_data(p_read_data),
         
         .data_mem_read_valid(d_read_valid), .data_mem_read_address(d_read_addr), 
-        .data_mem_read_ready(d_read_ready_delayed), .data_mem_read_data(final_read_data), 
+        .data_mem_read_ready(d_read_ready_pulse), .data_mem_read_data(final_read_data), 
         
         .data_mem_write_valid(d_write_valid), .data_mem_write_address(d_write_addr), 
         .data_mem_write_data(d_write_data), .data_mem_write_ready(1'b1)

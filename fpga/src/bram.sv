@@ -28,6 +28,7 @@ module bram #(
         for (int i = 0; i < DEPTH; i = i + 1) begin
             ram[i] = {DATA_WIDTH{1'b0}};
         end
+        $readmemh("data_mem.hex", ram);
     end
 
     // Port A
