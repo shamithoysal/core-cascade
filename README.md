@@ -38,7 +38,8 @@ Each core processes a single block of threads synchronously using a 7-stage pipe
 ## Custom ISA & Arithmetic
 
 ![Instruction Set Architecture](docs/images/ISA.png)
-*Figure 3: The custom 16-bit ISA implemented in the GPU Decoder.*
+
+ *Figure 3: The custom 16-bit ISA implemented in the GPU Decoder.*
 
 The GPU operates on a custom 16-bit instruction format. A major architectural optimization was the removal of the hardware divider (DIV), which caused timing violations. Instead, the system uses **reciprocal multiplication**:
 1. Pre-calculating the reciprocal of the screen width (e.g., 1/800).
