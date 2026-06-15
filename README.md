@@ -1,10 +1,12 @@
 # Core Cascade: A Custom 8-Core SIMT General Purpose GPU
 
-This repository contains the SystemVerilog source code and physical implementation of a custom, minimal Single Instruction, Multiple Threads (SIMT) Graphics Processing Unit (GPU). Built as an upgrade to the open-source "Tiny-GPU" architecture, this project scales the system to an 8-core compute cluster capable of managing 32 parallel threads in flight to drive high-resolution hardware rendering on an FPGA.
+This repository contains the SystemVerilog source code and physical implementation of a custom, minimal Single Instruction, Multiple Threads (SIMT) Graphics Processing Unit (GPU). Built as an upgrade to the open-source [Tiny-GPU](https://github.com/adam-maj/tiny-gpu) architecture, this project scales the system to an 8-core compute cluster capable of managing 32 parallel threads in flight to drive high-resolution hardware rendering on an FPGA.
+
+[Mandelbrot Render in Real Time (Drive Video)](https://drive.google.com/file/d/1I8h7uOuZY01NF4z1nrsknk4AxD2pMxky/view?usp=sharing)
 
 ## Project Overview
 
-Modern GPUs are often proprietary and complex. This project demystifies the fundamental architecture of hardware accelerators by building a fully functional General-Purpose GPU (GPGPU) from the "Tiny-GPU" Open Source baseline. 
+Modern GPUs are often proprietary and complex. This project demystifies the fundamental architecture of hardware accelerators by building a fully functional General-Purpose GPU (GPGPU) from the Open Source baseline. 
 
 **Key Specifications:**
 * **8-Core Compute Cluster**: Scaled from the original 2-core design to support massive parallelization.
@@ -100,4 +102,4 @@ The SAXPY (Scalar Alpha X Plus Y) routine bypasses the ALU intensive operations 
 * **Team Members**: Shamit Hoysal, Rushil Jain, Vamshikrishna V Bidari, Vikram Singh
 * **Project Mentors**: Mukul Paliwal, Ratan Y Mallya, Sirigiri Tarun
 
-This project was built upon the "Tiny-GPU" open source repository.
+This project was built upon the [Tiny-GPU](https://github.com/adam-maj/tiny-gpu) open source repository.
