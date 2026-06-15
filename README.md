@@ -1,16 +1,20 @@
-# IEEE Core Cascade: A Custom 8-Core SIMT GPU
+# Core Cascade: A Custom 8-Core SIMT General Purpose GPU
 
 This repository contains the SystemVerilog source code and physical implementation of a custom, minimal Single Instruction, Multiple Threads (SIMT) Graphics Processing Unit (GPU). Built as an upgrade to the open-source "Tiny-GPU" architecture, this project scales the system to an 8-core compute cluster capable of managing 32 parallel threads in flight to drive high-resolution hardware rendering on an FPGA.
 
 ## Project Overview
 
-Modern GPUs are often proprietary and complex. This project demystifies the fundamental architecture of hardware accelerators by building a fully functional General-Purpose GPU (GPGPU) from scratch.
+Modern GPUs are often proprietary and complex. This project demystifies the fundamental architecture of hardware accelerators by building a fully functional General-Purpose GPU (GPGPU) from the "Tiny-GPU" Open Source baseline. 
 
 **Key Specifications:**
 * **8-Core Compute Cluster**: Scaled from the original 2-core design to support massive parallelization.
 * **32-Bit Q8.24 Fixed-Point ALU**: Upgraded arithmetic unit providing extreme precision for deep mathematical workloads like fractal rendering.
+* **Expanded 16-bit ISA**: Added support for new Fixed Point operations and shift instructions.
 * **800x600 VGA Output**: An asynchronous dual-clock pipeline driving high-resolution video.
+* **Custom Round-Robin Memory Arbiter**: Upgraded from original Priority Encoder to support 32 individual Consumers.
 * **95 MHz Compute Clock**: Optimized via clock domain tuning to ensure hardware stability on the Artix-7 FPGA.
+* **Sustained Throughput:** **156.5 MOPS** (Compute-Bound Mandelbrot)
+* **Effective Memory Bandwidth:** **115.8 MB/s** (Memory-Bound SAXPY)
 
 ## Architecture
 
@@ -48,14 +52,38 @@ The GPU operates on a custom 16-bit instruction format. A major architectural op
 
 The SIMT execution model assumes all threads converge to the same Program Counter after each instruction, simplifying the scheduler for mathematically dense algorithms like the Mandelbrot set.
 
-## Benchmarking: Mandelbrot Set
+## Benchmarking:
 
-The system was validated by rendering the Mandelbrot set at an 800x600 resolution. This requires dispatching 480,000 parallel threads across 120,000 discrete blocks.
 
-![Simulation Trace](docs/images/trace.png)
-*Figure 5: Simulation waveform demonstrating successful thread dispatching and memory dump.*
+### Metrics Calculation
 
-While the Vivado software simulator requires over 25 minutes to resolve a single frame, the custom silicon on the Nexys 4 DDR board renders the fractal almost instantly.
+#### 1. Mandelbrot Routine (Compute-Bound Workload)
+The Mandelbrot set rendering acts as the primary stress test for the 8-core SIMT datapath. The system was validated by rendering the set at an 800x600 resolution. This requires dispatching 480,000 parallel threads across 120,000 discrete blocks. The architecture was evaluated based on physical execution time versus the required mathematical payload to determine Sustained Datapath MOPS.
+
+* **Resolution:** 800x600 (480,000 total threads/pixels)
+* **Operating Frequency:** 95 MHz
+* **Total Cycles (Recorded on FPGA 7-Segment):** 91,143,682 cycles (Hex: 0x56EBE02)
+* **Execution Time:** 0.959 seconds
+* **Datapath Operations per Iteration:** 9 operations (3 multiplications, 4 additions/subtractions, 1 shift, 1 comparison)
+* **Total Iterations (From Python Golden Model):** 16,686,475
+* **Total Useful Hardware Operations:** 150,178,275 operations
+
+**Performance Output:**
+* **Sustained Throughput:** **156.5 MOPS** (Million Operations Per Second)
+
+#### 2. SAXPY Routine (Memory-Bound Workload)
+The SAXPY (Scalar Alpha X Plus Y) routine bypasses the ALU intensive operations to stress-test the custom Round-Robin memory arbiter and BRAM bandwidth limits.
+
+* **Workload:** 5,000 independent threads
+* **Operating Frequency:** 95 MHz
+* **Total Cycles (Recorded on FPGA 7-Segment):** 49,200 cycles (Hex: 0xC030)
+* **Execution Time:** 517.9 microseconds
+* **Memory Payload per Thread:** 12 Bytes (Read X [4B], Read Y [4B], Write Z [4B])
+* **Total Data Transferred:** 60,000 Bytes (60 KB)
+
+**Performance Output:**
+* **Effective Memory Bandwidth:** **115.8 MB/s**
+
 
 ## Hardware Utilization (Artix-7 XC7A100T)
 
@@ -68,7 +96,7 @@ While the Vivado software simulator requires over 25 minutes to resolve a single
 ## Team
 
 **National Institute of Technology Karnataka, Surathkal**
-* **Team Members**: Rushil Jain, Shamit Hoysal, Vamshikrishna V Bidari, Vikram Singh
+* **Team Members**: Shamit Hoysal, Rushil Jain, Vamshikrishna V Bidari, Vikram Singh
 * **Project Mentors**: Mukul Paliwal, Ratan Y Mallya, Sirigiri Tarun
 
 This project was built upon the "Tiny-GPU" open source repository.
